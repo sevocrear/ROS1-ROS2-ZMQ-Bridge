@@ -1,0 +1,71 @@
+topics:
+  -
+    topic: /wheel_odometry/odometry
+    type: nav_msgs/msg/Odometry
+    queue_size: 1
+  # Map topic with transient_local QoS (latching) - matches ROS2 nav2 costmap
+  -
+    topic: /map
+    type: nav_msgs/msg/OccupancyGrid
+    queue_size: 1
+    qos:
+      history: keep_last
+      depth: 1
+      durability: transient_local
+      reliability: reliable
+  # TF topics - high frequency, use keep_last
+  -
+    topic: /tf
+    type: tf2_msgs/msg/TFMessage
+    queue_size: 100
+    qos:
+      history: keep_last
+      depth: 100
+      durability: volatile
+      reliability: reliable
+  # TF static with transient_local QoS (latching) - matches ROS2 tf2_ros
+  -
+    topic: /tf_static
+    type: tf2_msgs/msg/TFMessage
+    queue_size: 1
+    qos:
+      history: keep_last
+      depth: 10
+      durability: transient_local
+      reliability: reliable
+  # Control topics
+  -
+    topic: /control_cmd
+    type: ackermann_msgs/msg/AckermannDriveStamped
+    queue_size: 1
+    qos:
+      history: keep_last
+      depth: 1
+      durability: volatile
+      reliability: reliable
+  # Planner-specific topics
+  -
+    topic: /goal_pose
+    type: geometry_msgs/msg/PoseStamped
+    queue_size: 1
+    qos:
+      history: keep_last
+      depth: 1
+      durability: volatile
+      reliability: reliable
+  -
+    topic: /plan
+    type: nav_msgs/msg/Path
+    queue_size: 1
+    qos:
+      history: keep_last
+      depth: 1
+      durability: volatile
+      reliability: reliable
+
+
+# Services to bridge (monodirectional - ROS2 -> ROS1 only)
+services_2_to_1:
+  -
+    service: /move_base/make_plan
+    type: nav_msgs/GetPlan

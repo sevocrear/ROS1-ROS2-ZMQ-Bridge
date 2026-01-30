@@ -1,0 +1,41 @@
+# ROS1 relay: Ubuntu 20.04, ROS Noetic, ZMQ bridge
+ARG ARCH=amd64
+FROM ${ARCH}/ubuntu:20.04
+ARG ROS_VERSION=noetic
+ARG LSB_RELEASE=focal
+ARG ARCH=amd64
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV LSB_RELEASE=$LSB_RELEASE
+ENV ROS_VERSION=${ROS_VERSION}
+
+RUN apt-get update && \
+    apt-get install -y curl gnupg2 ca-certificates && \
+    update-ca-certificates && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+
+RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros/ubuntu $LSB_RELEASE main" > /etc/apt/sources.list.d/ros-latest.list && \
+    apt-get update
+
+RUN apt-get install -y ros-${ROS_VERSION}-ros-base
+
+RUN apt-get update && apt-get install -y \
+    ros-${ROS_VERSION}-navigation \
+    ros-${ROS_VERSION}-octomap-ros \
+    ros-${ROS_VERSION}-octomap-server \
+    ros-${ROS_VERSION}-map-server \
+    ros-${ROS_VERSION}-ackermann-msgs \
+    python3-venv && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+WORKDIR /opt/bridge
+RUN python3 -m venv /opt/bridge_venv --system-site-packages && \
+    curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    export PATH="/root/.local/bin:$PATH" && \
+    uv pip install --python /opt/bridge_venv/bin/python pyzmq
+
+COPY bridge/schema.py bridge/interfaces.py bridge/ros1_serializer.py bridge/ros1_handlers.py bridge/ros1_relay.py /opt/bridge/
+ENV PYTHONPATH=/opt/bridge
+ENV PATH="/root/.local/bin:$PATH"
+
+CMD ["bash", "-c", "source /opt/ros/noetic/setup.bash && exec /opt/bridge_venv/bin/python3 /opt/bridge/ros1_relay.py"]

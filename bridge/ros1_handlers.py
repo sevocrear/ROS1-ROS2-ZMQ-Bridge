@@ -1,0 +1,85 @@
+"""
+Concrete ROS1 bridge handlers. Builds ROS1Publisher and ROS1Subscriber from schema + ros1_serializer.
+All imports at module level.
+"""
+
+import json
+from typing import List
+
+import rospy
+
+from ackermann_msgs.msg import AckermannDriveStamped
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import OccupancyGrid, Path
+from tf2_msgs.msg import TFMessage
+
+from interfaces import ROS1Publisher, ROS1Subscriber, ZmqSender
+from schema import LATCHED_TOPICS, ROS1_TO_ROS2_TOPICS, ROS2_TO_ROS1_TOPICS, TOPIC_TO_TYPE
+import ros1_serializer
+
+
+# Topic -> ROS1 message class (for rospy)
+TOPIC_TO_ROS1_MSG = {
+    "/control_cmd": AckermannDriveStamped,
+    "/goal_pose": PoseStamped,
+    "/plan": Path,
+    "/map": OccupancyGrid,
+    "/tf": TFMessage,
+}
+
+
+class ROS1PublisherImpl(ROS1Publisher):
+    """Publishes to ROS1 from ZMQ payload (ros2->ros1)."""
+
+    def __init__(self, topic: str, publisher: rospy.Publisher):
+        self._topic = topic
+        self._publisher = publisher
+        self._msg_class = TOPIC_TO_ROS1_MSG[topic]
+
+    @property
+    def topic(self) -> str:
+        return self._topic
+
+    def publish_from_dict(self, payload: dict) -> None:
+        msg = ros1_serializer.deserialize_ros1(self._topic, payload, self._msg_class)
+        self._publisher.publish(msg)
+
+
+class ROS1SubscriberImpl(ROS1Subscriber):
+    """Subscribes to ROS1 and forwards to ZMQ (ros1->ros2)."""
+
+    def __init__(self, topic: str, msg_class: type):
+        self._topic = topic
+        self._msg_class = msg_class
+
+    @property
+    def topic(self) -> str:
+        return self._topic
+
+    def register(self, sender: ZmqSender) -> None:
+        def callback(msg):
+            try:
+                payload = ros1_serializer.serialize_ros1(self._topic, msg)
+                msg_type = TOPIC_TO_TYPE[self._topic]
+                body = json.dumps(payload).encode("utf-8")
+                sender(self._topic, msg_type, body)
+            except Exception as e:
+                rospy.logerr_throttle(5, f"ROS1 bridge subscriber {self._topic}: {e}")
+
+        rospy.Subscriber(self._topic, self._msg_class, callback)
+
+
+def create_ros1_publishers() -> List[ROS1Publisher]:
+    """Build one ROS1Publisher per ROS2->ROS1 topic. Latched for LATCHED_TOPICS (e.g. /map)."""
+    out = []
+    for topic in sorted(ROS2_TO_ROS1_TOPICS):
+        msg_class = TOPIC_TO_ROS1_MSG[topic]
+        latch = topic in LATCHED_TOPICS
+        pub = rospy.Publisher(topic, msg_class, queue_size=1, latch=latch)
+        out.append(ROS1PublisherImpl(topic, pub))
+    return out
+
+
+def create_ros1_subscribers() -> List[ROS1Subscriber]:
+    """Build one ROS1Subscriber per ROS1->ROS2 topic."""
+    return [ROS1SubscriberImpl(topic, TOPIC_TO_ROS1_MSG[topic]) for topic in sorted(ROS1_TO_ROS2_TOPICS)]

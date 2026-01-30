@@ -1,0 +1,55 @@
+# Standalone ROS1–ROS2 ZMQ bridge: roscore + bridge-ros1 + bridge-ros2
+
+services:
+  roscore:
+    image: ros:noetic-ros-core
+    container_name: roscore
+    command: /bin/bash -c "source /opt/ros/noetic/setup.bash && roscore"
+    network_mode: host
+    ipc: host
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - ROS_MASTER_URI=http://localhost:11311
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+
+  bridge-ros1:
+    image: ros1-ros2-zmq-bridge-ros1:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bridge_ros1
+      args:
+        ARCH: amd64
+        LSB_RELEASE: focal
+    network_mode: host
+    ipc: host
+    privileged: true
+    restart: unless-stopped
+    depends_on:
+      - roscore
+    environment:
+      - ROS_MASTER_URI=${ROS_MASTER_URI:-http://localhost:11311}
+      - BRIDGE_PEER_HOST=${BRIDGE_PEER_HOST:-127.0.0.1}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+
+  bridge-ros2:
+    image: ros1-ros2-zmq-bridge-ros2:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bridge_ros2
+      args:
+        ARCH: amd64
+        LSB_RELEASE: noble
+    network_mode: host
+    ipc: host
+    privileged: true
+    restart: unless-stopped
+    depends_on:
+      - bridge-ros1
+    environment:
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - BRIDGE_PEER_HOST=${BRIDGE_PEER_HOST:-127.0.0.1}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro

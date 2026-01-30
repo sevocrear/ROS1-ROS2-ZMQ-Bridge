@@ -1,0 +1,45 @@
+# ROS2 relay: Ubuntu 24.04, ROS 2 Kilted, ZMQ bridge
+ARG ARCH=amd64
+ARG LSB_RELEASE=noble
+FROM ${ARCH}/ubuntu:${LSB_RELEASE}
+ARG ARCH=amd64
+ARG LSB_RELEASE=noble
+ARG ROS_VERSION=kilted
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV LSB_RELEASE=$LSB_RELEASE
+ENV ROS_VERSION=$ROS_VERSION
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends locales && \
+    rm -rf /var/lib/apt/lists/* && \
+    locale-gen en_US en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+
+ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
+
+RUN apt-get update && \
+    apt-get install -y curl software-properties-common && \
+    add-apt-repository universe && \
+    apt-get update && \
+    export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}') && \
+    curl -L -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb" && \
+    dpkg -i /tmp/ros2-apt-source.deb && \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y ros-dev-tools ros-${ROS_VERSION}-ros-base python3-venv && \
+    apt-get install -y ros-${ROS_VERSION}-ackermann-msgs && \
+    rm -rf /var/lib/apt/lists/* /tmp/ros2-apt-source.deb
+
+WORKDIR /opt/bridge
+RUN python3 -m venv /opt/bridge_venv --system-site-packages && \
+    curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    export PATH="/root/.local/bin:$PATH" && \
+    uv pip install --python /opt/bridge_venv/bin/python pyzmq
+
+COPY bridge/schema.py bridge/interfaces.py bridge/ros2_serializer.py bridge/ros2_handlers.py bridge/ros2_relay.py /opt/bridge/
+ENV PYTHONPATH=/opt/bridge
+ENV PATH="/root/.local/bin:$PATH"
+ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+
+CMD ["bash", "-c", "source /opt/ros/${ROS_VERSION}/setup.bash && exec /opt/bridge_venv/bin/python3 /opt/bridge/ros2_relay.py"]
