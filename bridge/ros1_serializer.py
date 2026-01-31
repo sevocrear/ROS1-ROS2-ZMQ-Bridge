@@ -8,6 +8,8 @@ from geometry_msgs.msg import PoseStamped, TransformStamped
 from nav_msgs.msg import OccupancyGrid, Path
 from tf2_msgs.msg import TFMessage
 
+from schema import TOPIC_TO_TYPE
+
 
 # --- AckermannDriveStamped ---
 
@@ -223,33 +225,43 @@ def dict_to_path(d, msg_class):
     return msg
 
 
-# --- Topic dispatch ---
+# --- Type-based dispatch (topic names come from schema.TOPIC_TO_TYPE) ---
 
-def serialize_ros1(topic, msg):
-    """ROS1 message -> dict for given topic. Raises KeyError if topic not supported."""
-    if topic == "/control_cmd":
-        return ackermann_drive_stamped_to_dict(msg)
-    if topic == "/goal_pose":
-        return pose_stamped_to_dict(msg)
-    if topic == "/tf":
-        return tf_message_to_dict(msg)
-    if topic == "/map":
-        return occupancy_grid_to_dict(msg)
-    if topic == "/plan":
-        return path_to_dict(msg)
-    raise KeyError(f"serialize_ros1: unsupported topic {topic}")
+# Message type string (ROS2 style, from schema) -> (msg_to_dict_fn, dict_to_msg_fn)
+TYPE_TO_SERIALIZER = {
+    "ackermann_msgs/msg/AckermannDriveStamped": (
+        ackermann_drive_stamped_to_dict,
+        dict_to_ackermann_drive_stamped,
+    ),
+    "geometry_msgs/msg/PoseStamped": (pose_stamped_to_dict, dict_to_pose_stamped),
+    "nav_msgs/msg/Path": (path_to_dict, dict_to_path),
+    "nav_msgs/msg/OccupancyGrid": (
+        occupancy_grid_to_dict,
+        dict_to_occupancy_grid,
+    ),
+    "tf2_msgs/msg/TFMessage": (tf_message_to_dict, dict_to_tf_message),
+}
 
 
-def deserialize_ros1(topic, d, msg_class):
-    """Dict -> ROS1 message for given topic."""
-    if topic == "/control_cmd":
-        return dict_to_ackermann_drive_stamped(d, msg_class)
-    if topic == "/goal_pose":
-        return dict_to_pose_stamped(d, msg_class)
-    if topic == "/tf":
-        return dict_to_tf_message(d, msg_class)
-    if topic == "/map":
-        return dict_to_occupancy_grid(d, msg_class)
-    if topic == "/plan":
-        return dict_to_path(d, msg_class)
-    raise KeyError(f"deserialize_ros1: unsupported topic {topic}")
+def serialize_ros1(topic: str, msg):
+    """ROS1 message -> dict for given topic. Uses schema.TOPIC_TO_TYPE for dispatch."""
+    msg_type = TOPIC_TO_TYPE.get(topic)
+    if msg_type is None:
+        raise KeyError(f"serialize_ros1: topic not in schema: {topic}")
+    entry = TYPE_TO_SERIALIZER.get(msg_type)
+    if entry is None:
+        raise KeyError(f"serialize_ros1: type {msg_type} has no serializer")
+    to_dict_fn, _ = entry
+    return to_dict_fn(msg)
+
+
+def deserialize_ros1(topic: str, d: dict, msg_class):
+    """Dict -> ROS1 message for given topic. Uses schema.TOPIC_TO_TYPE for dispatch."""
+    msg_type = TOPIC_TO_TYPE.get(topic)
+    if msg_type is None:
+        raise KeyError(f"deserialize_ros1: topic not in schema: {topic}")
+    entry = TYPE_TO_SERIALIZER.get(msg_type)
+    if entry is None:
+        raise KeyError(f"deserialize_ros1: type {msg_type} has no deserializer")
+    _, to_msg_fn = entry
+    return to_msg_fn(d, msg_class)

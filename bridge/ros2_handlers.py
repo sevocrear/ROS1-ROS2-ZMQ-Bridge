@@ -20,13 +20,20 @@ from schema import ROS1_TO_ROS2_TOPICS, ROS2_TO_ROS1_TOPICS, TOPIC_TO_TYPE
 import ros2_serializer
 
 
-# Topic -> ROS2 message class
+# Message type string (from schema) -> ROS2 message class
+TYPE_TO_ROS2_MSG = {
+    "ackermann_msgs/msg/AckermannDriveStamped": AckermannDriveStamped,
+    "geometry_msgs/msg/PoseStamped": PoseStamped,
+    "nav_msgs/msg/Path": Path,
+    "nav_msgs/msg/OccupancyGrid": OccupancyGrid,
+    "tf2_msgs/msg/TFMessage": TFMessage,
+}
+
+# Topic -> ROS2 message class (derived from schema so topic names can change)
 TOPIC_TO_ROS2_MSG = {
-    "/control_cmd": AckermannDriveStamped,
-    "/goal_pose": PoseStamped,
-    "/plan": Path,
-    "/map": OccupancyGrid,
-    "/tf": TFMessage,
+    topic: TYPE_TO_ROS2_MSG[msg_type]
+    for topic, msg_type in TOPIC_TO_TYPE.items()
+    if msg_type in TYPE_TO_ROS2_MSG
 }
 
 

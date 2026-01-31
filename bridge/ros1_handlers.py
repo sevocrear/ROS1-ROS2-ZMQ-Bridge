@@ -18,13 +18,20 @@ from schema import LATCHED_TOPICS, ROS1_TO_ROS2_TOPICS, ROS2_TO_ROS1_TOPICS, TOP
 import ros1_serializer
 
 
-# Topic -> ROS1 message class (for rospy)
+# Message type string (from schema) -> ROS1 message class
+TYPE_TO_ROS1_MSG = {
+    "ackermann_msgs/msg/AckermannDriveStamped": AckermannDriveStamped,
+    "geometry_msgs/msg/PoseStamped": PoseStamped,
+    "nav_msgs/msg/Path": Path,
+    "nav_msgs/msg/OccupancyGrid": OccupancyGrid,
+    "tf2_msgs/msg/TFMessage": TFMessage,
+}
+
+# Topic -> ROS1 message class (derived from schema so topic names can change)
 TOPIC_TO_ROS1_MSG = {
-    "/control_cmd": AckermannDriveStamped,
-    "/goal_pose": PoseStamped,
-    "/plan": Path,
-    "/map": OccupancyGrid,
-    "/tf": TFMessage,
+    topic: TYPE_TO_ROS1_MSG[msg_type]
+    for topic, msg_type in TOPIC_TO_TYPE.items()
+    if msg_type in TYPE_TO_ROS1_MSG
 }
 
 
