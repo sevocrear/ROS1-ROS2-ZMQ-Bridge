@@ -7,6 +7,7 @@ All imports at module level; uses ROS2Publisher/ROS2Subscriber from ros2_handler
 
 import os
 import sys
+import queue
 import threading
 import time
 
@@ -18,7 +19,7 @@ if BRIDGE_DIR not in sys.path:
     sys.path.insert(0, BRIDGE_DIR)
 
 from rclpy.node import Node
-from schema import ROS1_TO_ROS2_TOPICS, decode_message
+from schema import ROS1_TO_ROS2_TOPICS, ROS2_TO_ROS1_TOPICS, SEND_QUEUE_MAXSIZE, decode_message
 from ros2_handlers import create_ros2_publishers, create_ros2_subscribers
 
 PEER_HOST = os.environ.get("BRIDGE_PEER_HOST", "127.0.0.1")
@@ -43,38 +44,92 @@ class ROS2BridgeRelay(Node):
         # Allow ZMQ connections to establish (slow joiner: SUB must connect before PUB sends)
         time.sleep(1.0)
 
+        # Per-topic queues (schema-driven): each topic has its own queue; one sender round-robins.
+        self._send_queues = {
+            topic: queue.Queue(maxsize=SEND_QUEUE_MAXSIZE)
+            for topic in ROS2_TO_ROS1_TOPICS
+        }
+        self._send_topics = sorted(self._send_queues.keys())
+        self._send_shutdown = threading.Event()
+        self._sender_thread = threading.Thread(target=self._zmq_sender_loop, daemon=True)
+        self._sender_thread.start()
+
         self._publishers = {p.topic: p for p in create_ros2_publishers(self)}
         for sub in create_ros2_subscribers(self):
             sub.register(self._send_to_zmq)
 
         self.get_logger().info(f"ROS2 relay: ZMQ connect to {PEER_HOST} (SUB {PORT_ROS1_TO_ROS2}, PUB {PORT_ROS2_TO_ROS1})")
 
+    def _zmq_sender_loop(self):
+        while not self._send_shutdown.is_set():
+            sent_any = False
+            for topic in self._send_topics:
+                try:
+                    item = self._send_queues[topic].get_nowait()
+                except queue.Empty:
+                    continue
+                if item is None:
+                    continue
+                msg_type, body = item
+                try:
+                    self.pub_sock.send_multipart([
+                        topic.encode("utf-8"),
+                        msg_type.encode("utf-8"),
+                        body,
+                    ])
+                    sent_any = True
+                except Exception as e:
+                    self.get_logger().error("ROS2 relay ZMQ send %s: %s" % (topic, e))
+            if not sent_any:
+                time.sleep(0.001)
+
     def _send_to_zmq(self, topic: str, msg_type: str, body: bytes) -> None:
-        self.pub_sock.send_multipart([topic.encode("utf-8"), msg_type.encode("utf-8"), body])
+        q = self._send_queues.get(topic)
+        if q is None:
+            return
+        try:
+            q.put_nowait((msg_type, body))
+        except queue.Full:
+            self.get_logger().warning("ROS2 relay: send queue full for %s, dropping" % topic)
 
     def run_zmq_receive_loop(self):
         while rclpy.ok():
             try:
                 frames = self.sub_sock.recv_multipart()
-                if len(frames) < 3:
-                    continue
-                topic = frames[0].decode("utf-8")
-                _msg_type = frames[1].decode("utf-8")
-                body = frames[2]
-                if topic not in ROS1_TO_ROS2_TOPICS:
-                    continue
-                publisher = self._publishers.get(topic)
-                if not publisher:
-                    continue
-                payload = decode_message(body)
-                publisher.publish_from_dict(payload)
-                self.get_logger().info("ROS2 relay: published %s from ZMQ" % topic)
             except zmq.Again:
                 continue
             except Exception as e:
                 self.get_logger().error("ROS2 relay ZMQ recv: %s" % e)
+                continue
+            if len(frames) != 3:
+                self.get_logger().warning(
+                    "ROS2 relay: ignoring ZMQ message with %d frames (expected 3)",
+                    len(frames),
+                )
+                continue
+            topic = frames[0].decode("utf-8")
+            _msg_type = frames[1].decode("utf-8")
+            body = frames[2]
+            if topic not in ROS1_TO_ROS2_TOPICS:
+                continue
+            publisher = self._publishers.get(topic)
+            if not publisher:
+                continue
+            try:
+                payload = decode_message(body)
+            except (ValueError, UnicodeDecodeError) as e:
+                self.get_logger().warning("ROS2 relay: invalid ZMQ body for %s: %s" % (topic, e))
+                continue
+            publisher.publish_from_dict(payload)
 
     def destroy_node(self, *args, **kwargs):
+        self._send_shutdown.set()
+        for q in self._send_queues.values():
+            try:
+                q.put_nowait(None)
+            except queue.Full:
+                pass
+        self._sender_thread.join(timeout=2.0)
         self._zmq_context.term()
         super().destroy_node(*args, **kwargs)
 

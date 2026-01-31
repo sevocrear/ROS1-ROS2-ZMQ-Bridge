@@ -8,7 +8,9 @@ All imports at module level; uses ROS1Publisher/ROS1Subscriber from ros1_handler
 import os
 import sys
 import json
+import queue
 import threading
+import time
 
 import rospy
 import zmq
@@ -17,7 +19,7 @@ BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BRIDGE_DIR not in sys.path:
     sys.path.insert(0, BRIDGE_DIR)
 
-from schema import ROS2_TO_ROS1_TOPICS, decode_message
+from schema import ROS1_TO_ROS2_TOPICS, ROS2_TO_ROS1_TOPICS, SEND_QUEUE_MAXSIZE, decode_message
 from ros1_handlers import create_ros1_publishers, create_ros1_subscribers
 
 PORT_ROS1_TO_ROS2 = int(os.environ.get("BRIDGE_ZMQ_PORT_ROS1_TO_ROS2", "5555"))
@@ -44,8 +46,48 @@ def main():
     pub_sock.setsockopt(zmq.SNDHWM, 10)
     pub_sock.bind(f"tcp://*:{PORT_ROS1_TO_ROS2}")
 
+    # Per-topic queues (schema-driven): each topic has its own queue; one sender round-robins.
+    send_queues = {
+        topic: queue.Queue(maxsize=SEND_QUEUE_MAXSIZE)
+        for topic in ROS1_TO_ROS2_TOPICS
+    }
+    send_topics = sorted(send_queues.keys())
+    _shutdown = threading.Event()
+
+    def zmq_sender_loop():
+        while not _shutdown.is_set():
+            sent_any = False
+            for topic in send_topics:
+                try:
+                    item = send_queues[topic].get_nowait()
+                except queue.Empty:
+                    continue
+                if item is None:
+                    continue
+                msg_type, body = item
+                try:
+                    pub_sock.send_multipart([
+                        topic.encode("utf-8"),
+                        msg_type.encode("utf-8"),
+                        body,
+                    ])
+                    sent_any = True
+                except Exception as e:
+                    rospy.logerr_throttle(5, "ROS1 relay ZMQ send %s: %s", topic, e)
+            if not sent_any:
+                time.sleep(0.001)
+
     def send_to_zmq(topic: str, msg_type: str, body: bytes) -> None:
-        pub_sock.send_multipart([topic.encode("utf-8"), msg_type.encode("utf-8"), body])
+        q = send_queues.get(topic)
+        if q is None:
+            return
+        try:
+            q.put_nowait((msg_type, body))
+        except queue.Full:
+            rospy.logwarn_throttle(2, "ROS1 relay: send queue full for %s, dropping", topic)
+
+    sender_thread = threading.Thread(target=zmq_sender_loop, daemon=True)
+    sender_thread.start()
 
     for sub in subscribers:
         sub.register(send_to_zmq)
@@ -81,7 +123,16 @@ def main():
     t = threading.Thread(target=zmq_receive_loop, daemon=True)
     t.start()
 
-    rospy.spin()
+    try:
+        rospy.spin()
+    finally:
+        _shutdown.set()
+        for q in send_queues.values():
+            try:
+                q.put_nowait(None)
+            except queue.Full:
+                pass
+        sender_thread.join(timeout=2.0)
     context.term()
 
 

@@ -10,7 +10,7 @@ import rospy
 
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseStamped
-from nav_msgs.msg import OccupancyGrid, Path
+from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from tf2_msgs.msg import TFMessage
 
 from interfaces import ROS1Publisher, ROS1Subscriber, ZmqSender
@@ -24,6 +24,7 @@ TYPE_TO_ROS1_MSG = {
     "geometry_msgs/msg/PoseStamped": PoseStamped,
     "nav_msgs/msg/Path": Path,
     "nav_msgs/msg/OccupancyGrid": OccupancyGrid,
+    "nav_msgs/msg/Odometry": Odometry,
     "tf2_msgs/msg/TFMessage": TFMessage,
 }
 

@@ -12,7 +12,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseStamped
-from nav_msgs.msg import OccupancyGrid, Path
+from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from tf2_msgs.msg import TFMessage
 
 from interfaces import ROS2Publisher, ROS2Subscriber, ZmqSender
@@ -26,6 +26,7 @@ TYPE_TO_ROS2_MSG = {
     "geometry_msgs/msg/PoseStamped": PoseStamped,
     "nav_msgs/msg/Path": Path,
     "nav_msgs/msg/OccupancyGrid": OccupancyGrid,
+    "nav_msgs/msg/Odometry": Odometry,
     "tf2_msgs/msg/TFMessage": TFMessage,
 }
 
@@ -105,7 +106,7 @@ def create_ros2_publishers(node: Node) -> List[ROS2Publisher]:
     out = []
     for topic in sorted(ROS1_TO_ROS2_TOPICS):
         msg_class = TOPIC_TO_ROS2_MSG[topic]
-        qos = _default_qos(100 if topic == "/tf" else 1)
+        qos = _default_qos(100 if topic == "/tf" else (10 if topic == "/wheel_odometry/odometry" else 1))
         pub = node.create_publisher(msg_class, topic, qos)
         out.append(ROS2PublisherImpl(node, topic, pub))
     return out

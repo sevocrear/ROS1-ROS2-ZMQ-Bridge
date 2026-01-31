@@ -5,7 +5,7 @@ Used only in ros1_relay (rospy). All imports at module level.
 
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseStamped, TransformStamped
-from nav_msgs.msg import OccupancyGrid, Path
+from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from tf2_msgs.msg import TFMessage
 
 from schema import TOPIC_TO_TYPE
@@ -200,6 +200,77 @@ def dict_to_occupancy_grid(d, msg_class):
     return msg
 
 
+# --- Odometry ---
+
+def odometry_to_dict(msg):
+    """ROS1 Odometry -> dict (ROS2-compatible: stamp.sec, stamp.nanosec)."""
+    return {
+        "header": {
+            "stamp": {"sec": msg.header.stamp.secs, "nanosec": msg.header.stamp.nsecs},
+            "frame_id": msg.header.frame_id or "",
+        },
+        "child_frame_id": msg.child_frame_id or "",
+        "pose": {
+            "pose": {
+                "position": {"x": msg.pose.pose.position.x, "y": msg.pose.pose.position.y, "z": msg.pose.pose.position.z},
+                "orientation": {
+                    "x": msg.pose.pose.orientation.x,
+                    "y": msg.pose.pose.orientation.y,
+                    "z": msg.pose.pose.orientation.z,
+                    "w": msg.pose.pose.orientation.w,
+                },
+            },
+            "covariance": list(msg.pose.covariance),
+        },
+        "twist": {
+            "twist": {
+                "linear": {"x": msg.twist.twist.linear.x, "y": msg.twist.twist.linear.y, "z": msg.twist.twist.linear.z},
+                "angular": {"x": msg.twist.twist.angular.x, "y": msg.twist.twist.angular.y, "z": msg.twist.twist.angular.z},
+            },
+            "covariance": list(msg.twist.covariance),
+        },
+    }
+
+
+def dict_to_odometry(d, msg_class):
+    """Dict -> ROS1 Odometry."""
+    msg = msg_class()
+    h = d.get("header", {})
+    stamp = h.get("stamp", {})
+    msg.header.stamp.secs = stamp.get("secs", stamp.get("sec", 0))
+    msg.header.stamp.nsecs = stamp.get("nsecs", stamp.get("nanosec", 0))
+    msg.header.frame_id = h.get("frame_id", "")
+    msg.child_frame_id = d.get("child_frame_id", "")
+    pose_block = d.get("pose", {})
+    p = pose_block.get("pose", {})
+    pos = p.get("position", {})
+    msg.pose.pose.position.x = float(pos.get("x", 0))
+    msg.pose.pose.position.y = float(pos.get("y", 0))
+    msg.pose.pose.position.z = float(pos.get("z", 0))
+    ori = p.get("orientation", {})
+    msg.pose.pose.orientation.x = float(ori.get("x", 0))
+    msg.pose.pose.orientation.y = float(ori.get("y", 0))
+    msg.pose.pose.orientation.z = float(ori.get("z", 0))
+    msg.pose.pose.orientation.w = float(ori.get("w", 1))
+    cov = pose_block.get("covariance", [])
+    for i in range(min(36, len(cov))):
+        msg.pose.covariance[i] = float(cov[i])
+    twist_block = d.get("twist", {})
+    t = twist_block.get("twist", {})
+    lin = t.get("linear", {})
+    msg.twist.twist.linear.x = float(lin.get("x", 0))
+    msg.twist.twist.linear.y = float(lin.get("y", 0))
+    msg.twist.twist.linear.z = float(lin.get("z", 0))
+    ang = t.get("angular", {})
+    msg.twist.twist.angular.x = float(ang.get("x", 0))
+    msg.twist.twist.angular.y = float(ang.get("y", 0))
+    msg.twist.twist.angular.z = float(ang.get("z", 0))
+    cov_t = twist_block.get("covariance", [])
+    for i in range(min(36, len(cov_t))):
+        msg.twist.covariance[i] = float(cov_t[i])
+    return msg
+
+
 # --- Path ---
 
 def path_to_dict(msg):
@@ -239,6 +310,7 @@ TYPE_TO_SERIALIZER = {
         occupancy_grid_to_dict,
         dict_to_occupancy_grid,
     ),
+    "nav_msgs/msg/Odometry": (odometry_to_dict, dict_to_odometry),
     "tf2_msgs/msg/TFMessage": (tf_message_to_dict, dict_to_tf_message),
 }
 
