@@ -3,6 +3,9 @@ Serialize/deserialize between ROS1 messages and JSON dict (shared shape with ROS
 Used only in ros1_relay (rospy). All imports at module level.
 """
 
+import array as _array
+import base64
+
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
@@ -150,7 +153,8 @@ def dict_to_tf_message(d, msg_class):
 # --- OccupancyGrid ---
 
 def occupancy_grid_to_dict(msg):
-    """ROS1 OccupancyGrid -> dict."""
+    """ROS1 OccupancyGrid -> dict.  Data is base64-encoded (signed int8) for efficiency."""
+    raw = _array.array('b', msg.data).tobytes()
     return {
         "header": {
             "stamp": {"sec": msg.header.stamp.secs, "nanosec": msg.header.stamp.nsecs},
@@ -170,12 +174,12 @@ def occupancy_grid_to_dict(msg):
                 },
             },
         },
-        "data": list(msg.data),
+        "data_b64": base64.b64encode(raw).decode("ascii"),
     }
 
 
 def dict_to_occupancy_grid(d, msg_class):
-    """Dict -> ROS1 OccupancyGrid."""
+    """Dict -> ROS1 OccupancyGrid.  Accepts base64 (data_b64) or legacy int-list (data)."""
     msg = msg_class()
     h = d.get("header", {})
     stamp = h.get("stamp", {})
@@ -196,7 +200,13 @@ def dict_to_occupancy_grid(d, msg_class):
     msg.info.origin.orientation.y = float(ori.get("y", 0))
     msg.info.origin.orientation.z = float(ori.get("z", 0))
     msg.info.origin.orientation.w = float(ori.get("w", 1))
-    msg.data = list(d.get("data", []))
+    if "data_b64" in d:
+        raw = base64.b64decode(d["data_b64"])
+        a = _array.array('b')
+        a.frombytes(raw)
+        msg.data = list(a)
+    else:
+        msg.data = list(d.get("data", []))
     return msg
 
 

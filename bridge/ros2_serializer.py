@@ -3,6 +3,9 @@ Serialize/deserialize between ROS2 messages and JSON dict (shared shape with ROS
 Used only in ros2_relay (rclpy). All imports at module level.
 """
 
+import array as _array
+import base64
+
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
@@ -150,7 +153,11 @@ def dict_to_tf_message(d, msg_class):
 # --- OccupancyGrid ---
 
 def occupancy_grid_to_dict(msg):
-    """ROS2 OccupancyGrid -> dict."""
+    """ROS2 OccupancyGrid -> dict.  Data is base64-encoded (signed int8) for efficiency."""
+    if hasattr(msg.data, 'tobytes'):
+        raw = msg.data.tobytes()
+    else:
+        raw = _array.array('b', msg.data).tobytes()
     return {
         "header": {
             "stamp": {"sec": msg.header.stamp.sec, "nanosec": msg.header.stamp.nanosec},
@@ -170,12 +177,12 @@ def occupancy_grid_to_dict(msg):
                 },
             },
         },
-        "data": list(msg.data),
+        "data_b64": base64.b64encode(raw).decode("ascii"),
     }
 
 
 def dict_to_occupancy_grid(d, msg_class):
-    """Dict -> ROS2 OccupancyGrid."""
+    """Dict -> ROS2 OccupancyGrid.  Accepts base64 (data_b64) or legacy int-list (data)."""
     msg = msg_class()
     h = d.get("header", {})
     stamp = h.get("stamp", {})
@@ -196,7 +203,13 @@ def dict_to_occupancy_grid(d, msg_class):
     msg.info.origin.orientation.y = float(ori.get("y", 0))
     msg.info.origin.orientation.z = float(ori.get("z", 0))
     msg.info.origin.orientation.w = float(ori.get("w", 1))
-    msg.data = list(d.get("data", []))
+    if "data_b64" in d:
+        raw = base64.b64decode(d["data_b64"])
+        a = _array.array('b')
+        a.frombytes(raw)
+        msg.data = a
+    else:
+        msg.data = list(d.get("data", []))
     return msg
 
 

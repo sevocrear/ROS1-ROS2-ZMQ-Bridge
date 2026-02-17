@@ -47,6 +47,16 @@ def _default_qos(depth: int = 10) -> QoSProfile:
     )
 
 
+def _sensor_qos(depth: int = 100) -> QoSProfile:
+    """Best-effort QoS for high-rate, loss-tolerant topics (/tf, odometry)."""
+    return QoSProfile(
+        depth=depth,
+        reliability=ReliabilityPolicy.BEST_EFFORT,
+        history=HistoryPolicy.KEEP_LAST,
+        durability=DurabilityPolicy.VOLATILE,
+    )
+
+
 def _map_qos() -> QoSProfile:
     """Transient local for /map (latching)."""
     return QoSProfile(
@@ -97,7 +107,12 @@ class ROS2SubscriberImpl(ROS2Subscriber):
             except Exception as e:
                 self._node.get_logger().error(f"ROS2 bridge subscriber {self._topic}: {e}")
 
-        qos = _map_qos() if self._topic == "/map" else _default_qos(100 if self._topic == "/tf" else 1)
+        if self._topic == "/map":
+            qos = _map_qos()
+        elif self._topic == "/tf":
+            qos = _sensor_qos(100)
+        else:
+            qos = _default_qos(1)
         self._node.create_subscription(self._msg_class, self._topic, callback, qos)
 
 
@@ -106,7 +121,10 @@ def create_ros2_publishers(node: Node) -> List[ROS2Publisher]:
     out = []
     for topic in sorted(ROS1_TO_ROS2_TOPICS):
         msg_class = TOPIC_TO_ROS2_MSG[topic]
-        qos = _default_qos(100 if topic == "/tf" else (10 if topic == "/wheel_odometry/odometry" else 1))
+        if topic in ("/tf", "/wheel_odometry/odometry"):
+            qos = _sensor_qos(100 if topic == "/tf" else 10)
+        else:
+            qos = _default_qos(1)
         pub = node.create_publisher(msg_class, topic, qos)
         out.append(ROS2PublisherImpl(node, topic, pub))
     return out

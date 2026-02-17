@@ -74,7 +74,7 @@ class ROS1SubscriberImpl(ROS1Subscriber):
             except Exception as e:
                 rospy.logerr_throttle(5, f"ROS1 bridge subscriber {self._topic}: {e}")
 
-        rospy.Subscriber(self._topic, self._msg_class, callback)
+        rospy.Subscriber(self._topic, self._msg_class, callback, queue_size=10)
 
 
 def create_ros1_publishers() -> List[ROS1Publisher]:
