@@ -61,10 +61,16 @@ class ROS2BridgeRelay(Node):
         if ZMQ_CONNECT_DELAY > 0:
             time.sleep(ZMQ_CONNECT_DELAY)
 
-        # --- ZMQ sender (ROS2 callbacks -> ZMQ) ---
-        self._send_queue = queue.Queue(
-            maxsize=SEND_QUEUE_MAXSIZE * max(len(ROS2_TO_ROS1_TOPICS), 1)
-        )
+        # --- Per-topic send queues (ROS2 callbacks -> ZMQ) ---
+        # Each topic gets its own bounded queue so a high-rate topic cannot
+        # starve or cause drops for a low-rate topic.
+        # A shared Event wakes the sender thread instantly (no busy-wait).
+        self._send_queues = {
+            topic: queue.Queue(maxsize=SEND_QUEUE_MAXSIZE)
+            for topic in ROS2_TO_ROS1_TOPICS
+        }
+        self._send_topics = sorted(self._send_queues.keys())
+        self._send_wake = threading.Event()
         self._send_shutdown = threading.Event()
         self._sender_thread = threading.Thread(
             target=self._zmq_sender_loop, daemon=True
@@ -91,28 +97,37 @@ class ROS2BridgeRelay(Node):
 
     def _zmq_sender_loop(self):
         while not self._send_shutdown.is_set():
-            try:
-                item = self._send_queue.get(timeout=0.1)
-            except queue.Empty:
-                continue
-            if item is None:
-                break
-            topic_b, type_b, body = item
-            try:
-                self.pub_sock.send_multipart([topic_b, type_b, body])
-            except Exception as e:
-                self.get_logger().error("ROS2 relay ZMQ send: %s" % e)
+            self._send_wake.wait(timeout=0.1)
+            self._send_wake.clear()
+            for topic in self._send_topics:
+                q = self._send_queues[topic]
+                topic_b, type_b = _TOPIC_FRAMES[topic]
+                while True:
+                    try:
+                        body = q.get_nowait()
+                    except queue.Empty:
+                        break
+                    if body is None:
+                        return
+                    try:
+                        self.pub_sock.send_multipart([topic_b, type_b, body])
+                    except Exception as e:
+                        self.get_logger().error(
+                            "ROS2 relay ZMQ send %s: %s" % (topic, e)
+                        )
 
     def _send_to_zmq(self, topic: str, msg_type: str, body: bytes) -> None:
-        frames = _TOPIC_FRAMES.get(topic)
-        if frames is None:
+        q = self._send_queues.get(topic)
+        if q is None:
             return
         try:
-            self._send_queue.put_nowait((*frames, body))
+            q.put_nowait(body)
         except queue.Full:
             self.get_logger().warning(
                 "ROS2 relay: send queue full for %s, dropping" % topic
             )
+            return
+        self._send_wake.set()
 
     # ---- ZMQ receiver (incoming: ROS1 -> ZMQ -> ROS2) ----
 
@@ -174,10 +189,12 @@ class ROS2BridgeRelay(Node):
 
     def destroy_node(self, *args, **kwargs):
         self._send_shutdown.set()
-        try:
-            self._send_queue.put_nowait(None)
-        except queue.Full:
-            pass
+        for q in self._send_queues.values():
+            try:
+                q.put_nowait(None)
+            except queue.Full:
+                pass
+        self._send_wake.set()
         self._sender_thread.join(timeout=2.0)
         self.pub_sock.close()
         self.sub_sock.close()

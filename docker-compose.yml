@@ -6,13 +6,17 @@ services:
     container_name: roscore
     command: /bin/bash -c "source /opt/ros/noetic/setup.bash && roscore"
     network_mode: host
-    ipc: host
-    privileged: true
     restart: unless-stopped
     environment:
       - ROS_MASTER_URI=http://localhost:11311
     volumes:
       - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f roscore || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   bridge-ros1:
     image: ros1-ros2-zmq-bridge-ros1:latest
@@ -23,8 +27,6 @@ services:
         ARCH: amd64
         LSB_RELEASE: focal
     network_mode: host
-    ipc: host
-    privileged: true
     restart: unless-stopped
     depends_on:
       - roscore
@@ -33,6 +35,12 @@ services:
       - BRIDGE_PEER_HOST=${BRIDGE_PEER_HOST:-127.0.0.1}
     volumes:
       - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f ros1_relay || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   bridge-ros2:
     image: ros1-ros2-zmq-bridge-ros2:latest
@@ -43,8 +51,6 @@ services:
         ARCH: amd64
         LSB_RELEASE: noble
     network_mode: host
-    ipc: host
-    privileged: true
     restart: unless-stopped
     depends_on:
       - bridge-ros1
@@ -53,3 +59,9 @@ services:
       - BRIDGE_PEER_HOST=${BRIDGE_PEER_HOST:-127.0.0.1}
     volumes:
       - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f ros2_relay || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

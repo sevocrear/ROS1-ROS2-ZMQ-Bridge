@@ -18,17 +18,21 @@ RUN apt-get update && \
 
 ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 
+ARG ROS_APT_SOURCE_VERSION=1.1.0
 RUN apt-get update && \
     apt-get install -y curl software-properties-common && \
     add-apt-repository universe && \
     apt-get update && \
-    export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}') && \
-    curl -L -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb" && \
+    curl -fsSL -o /tmp/ros2-apt-source.deb \
+        "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb" && \
     dpkg -i /tmp/ros2-apt-source.deb && \
     apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y ros-dev-tools ros-${ROS_VERSION}-ros-base python3-venv && \
-    apt-get install -y ros-${ROS_VERSION}-ackermann-msgs && \
+    apt-get install -y ros-${ROS_VERSION}-ros-base python3-venv && \
+    apt-get install -y \
+        ros-${ROS_VERSION}-nav-msgs \
+        ros-${ROS_VERSION}-tf2-msgs \
+        ros-${ROS_VERSION}-ackermann-msgs && \
     rm -rf /var/lib/apt/lists/* /tmp/ros2-apt-source.deb
 
 WORKDIR /opt/bridge
@@ -41,5 +45,5 @@ COPY bridge/schema.py bridge/interfaces.py bridge/ros2_serializer.py bridge/ros2
 ENV PYTHONPATH=/opt/bridge
 ENV PATH="/root/.local/bin:$PATH"
 ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-
+RUN echo "source /opt/ros/${ROS_VERSION}/setup.bash" >> ~/.bashrc
 CMD ["bash", "-c", "source /opt/ros/${ROS_VERSION}/setup.bash && exec /opt/bridge_venv/bin/python3 /opt/bridge/ros2_relay.py"]

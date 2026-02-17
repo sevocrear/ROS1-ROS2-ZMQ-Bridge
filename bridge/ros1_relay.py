@@ -54,34 +54,46 @@ def main():
     pub_sock.setsockopt(zmq.LINGER, 100)
     pub_sock.bind(f"tcp://*:{PORT_ROS1_TO_ROS2}")
 
-    # Single shared send queue — blocking get() eliminates the 1 kHz busy-wait.
-    send_queue = queue.Queue(
-        maxsize=SEND_QUEUE_MAXSIZE * max(len(ROS1_TO_ROS2_TOPICS), 1)
-    )
+    # Per-topic queues give each topic its own buffer so a high-rate topic
+    # cannot starve or drop messages from a low-rate topic.
+    # A shared Event wakes the sender thread instantly (no busy-wait).
+    send_queues = {
+        topic: queue.Queue(maxsize=SEND_QUEUE_MAXSIZE)
+        for topic in ROS1_TO_ROS2_TOPICS
+    }
+    send_topics = sorted(send_queues.keys())
+    _wake = threading.Event()
     _shutdown = threading.Event()
 
     def zmq_sender_loop():
         while not _shutdown.is_set():
-            try:
-                item = send_queue.get(timeout=0.1)
-            except queue.Empty:
-                continue
-            if item is None:
-                break
-            topic_b, type_b, body = item
-            try:
-                pub_sock.send_multipart([topic_b, type_b, body])
-            except Exception as e:
-                rospy.logerr_throttle(5, "ROS1 relay ZMQ send: %s", e)
+            _wake.wait(timeout=0.1)
+            _wake.clear()
+            for topic in send_topics:
+                q = send_queues[topic]
+                topic_b, type_b = _TOPIC_FRAMES[topic]
+                while True:
+                    try:
+                        body = q.get_nowait()
+                    except queue.Empty:
+                        break
+                    if body is None:
+                        return
+                    try:
+                        pub_sock.send_multipart([topic_b, type_b, body])
+                    except Exception as e:
+                        rospy.logerr_throttle(5, "ROS1 relay ZMQ send %s: %s", topic, e)
 
     def send_to_zmq(topic: str, msg_type: str, body: bytes) -> None:
-        frames = _TOPIC_FRAMES.get(topic)
-        if frames is None:
+        q = send_queues.get(topic)
+        if q is None:
             return
         try:
-            send_queue.put_nowait((*frames, body))
+            q.put_nowait(body)
         except queue.Full:
             rospy.logwarn_throttle(2, "ROS1 relay: send queue full for %s, dropping", topic)
+            return
+        _wake.set()
 
     sender_thread = threading.Thread(target=zmq_sender_loop, daemon=True)
     sender_thread.start()
@@ -132,10 +144,12 @@ def main():
         rospy.spin()
     finally:
         _shutdown.set()
-        try:
-            send_queue.put_nowait(None)
-        except queue.Full:
-            pass
+        for q in send_queues.values():
+            try:
+                q.put_nowait(None)
+            except queue.Full:
+                pass
+        _wake.set()
         sender_thread.join(timeout=2.0)
         pub_sock.close()
         sub_sock.close()

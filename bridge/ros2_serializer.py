@@ -209,7 +209,8 @@ def dict_to_occupancy_grid(d, msg_class):
         a.frombytes(raw)
         msg.data = a
     else:
-        msg.data = list(d.get("data", []))
+        a = _array.array('b', [int(v) for v in d.get("data", [])])
+        msg.data = a
     return msg
 
 

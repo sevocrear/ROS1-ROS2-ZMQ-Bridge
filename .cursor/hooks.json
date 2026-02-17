@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": ".cursor/hooks/check-readme-update.sh",
+        "timeout": 10
+      }
+    ]
+  }
+}
