@@ -109,8 +109,6 @@ class ROS2SubscriberImpl(ROS2Subscriber):
 
         if self._topic == "/map":
             qos = _map_qos()
-        elif self._topic == "/tf":
-            qos = _sensor_qos(100)
         else:
             qos = _default_qos(1)
         self._node.create_subscription(self._msg_class, self._topic, callback, qos)
@@ -121,8 +119,8 @@ def create_ros2_publishers(node: Node) -> List[ROS2Publisher]:
     out = []
     for topic in sorted(ROS1_TO_ROS2_TOPICS):
         msg_class = TOPIC_TO_ROS2_MSG[topic]
-        if topic in ("/tf", "/wheel_odometry/odometry"):
-            qos = _sensor_qos(100 if topic == "/tf" else 10)
+        if topic in ("/wheel_odometry/odometry",):
+            qos = _sensor_qos(10)
         else:
             qos = _default_qos(1)
         pub = node.create_publisher(msg_class, topic, qos)
