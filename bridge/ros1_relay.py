@@ -17,15 +17,13 @@ BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BRIDGE_DIR not in sys.path:
     sys.path.insert(0, BRIDGE_DIR)
 
-from schema import (
-    ROS1_TO_ROS2_TOPICS, ROS2_TO_ROS1_TOPICS,
-    SEND_QUEUE_MAXSIZE, ZMQ_HWM, TOPIC_TO_TYPE,
-    decode_message, _env_int,
-)
+from config_utils import SEND_QUEUE_MAXSIZE, ZMQ_HWM, env_int
+from json_utils import decode_message
+from schema import ROS1_TO_ROS2_TOPICS, ROS2_TO_ROS1_TOPICS, TOPIC_TO_TYPE
 from ros1_handlers import create_ros1_publishers, create_ros1_subscribers
 
-PORT_ROS1_TO_ROS2 = _env_int("BRIDGE_ZMQ_PORT_ROS1_TO_ROS2", 5555)
-PORT_ROS2_TO_ROS1 = _env_int("BRIDGE_ZMQ_PORT_ROS2_TO_ROS1", 5556)
+PORT_ROS1_TO_ROS2 = env_int("BRIDGE_ZMQ_PORT_ROS1_TO_ROS2", 5555)
+PORT_ROS2_TO_ROS1 = env_int("BRIDGE_ZMQ_PORT_ROS2_TO_ROS1", 5556)
 
 # Pre-encode ZMQ topic/type frames (avoids per-message string allocation).
 _TOPIC_FRAMES = {

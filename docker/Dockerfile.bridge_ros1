@@ -32,7 +32,7 @@ RUN python3 -m venv /opt/bridge_venv --system-site-packages && \
     export PATH="/root/.local/bin:$PATH" && \
     uv pip install --python /opt/bridge_venv/bin/python pyzmq
 
-COPY bridge/schema.py bridge/interfaces.py bridge/ros1_serializer.py bridge/ros1_handlers.py bridge/ros1_relay.py /opt/bridge/
+COPY bridge/schema.py bridge/interfaces.py bridge/config_utils.py bridge/json_utils.py bridge/ros1_serializer.py bridge/ros1_handlers.py bridge/ros1_relay.py /opt/bridge/
 ENV PYTHONPATH=/opt/bridge
 ENV PATH="/root/.local/bin:$PATH"
 

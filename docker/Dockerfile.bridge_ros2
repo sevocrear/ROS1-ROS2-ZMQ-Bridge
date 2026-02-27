@@ -41,7 +41,7 @@ RUN python3 -m venv /opt/bridge_venv --system-site-packages && \
     export PATH="/root/.local/bin:$PATH" && \
     uv pip install --python /opt/bridge_venv/bin/python pyzmq
 
-COPY bridge/schema.py bridge/interfaces.py bridge/ros2_serializer.py bridge/ros2_handlers.py bridge/ros2_relay.py /opt/bridge/
+COPY bridge/schema.py bridge/interfaces.py bridge/config_utils.py bridge/json_utils.py bridge/qos_resolver.py bridge/ros2_serializer.py bridge/ros2_handlers.py bridge/ros2_relay.py /opt/bridge/
 ENV PYTHONPATH=/opt/bridge
 ENV PATH="/root/.local/bin:$PATH"
 ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp

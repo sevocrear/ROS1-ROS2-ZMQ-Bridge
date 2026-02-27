@@ -1,5 +1,6 @@
 """
-Concrete ROS1 bridge handlers. Builds ROS1Publisher and ROS1Subscriber from schema + ros1_serializer.
+Concrete ROS1 bridge handlers. Builds ROS1Publisher and ROS1Subscriber from
+schema + ros1_serializer.
 All imports at module level.
 """
 
@@ -14,7 +15,16 @@ from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from tf2_msgs.msg import TFMessage
 
 from interfaces import ROS1Publisher, ROS1Subscriber, ZmqSender
-from schema import LATCHED_TOPICS, ROS1_TO_ROS2_TOPICS, ROS2_TO_ROS1_TOPICS, TOPIC_TO_TYPE
+from schema import (
+    LATCHED_TOPICS,
+    ROS1_PUBLISHER_QUEUE_SIZE_DEFAULT,
+    ROS1_PUBLISHER_QUEUE_SIZE_OVERRIDES,
+    ROS1_SUBSCRIBER_QUEUE_SIZE_DEFAULT,
+    ROS1_SUBSCRIBER_QUEUE_SIZE_OVERRIDES,
+    ROS1_TO_ROS2_TOPICS,
+    ROS2_TO_ROS1_TOPICS,
+    TOPIC_TO_TYPE,
+)
 import ros1_serializer
 
 
@@ -74,7 +84,11 @@ class ROS1SubscriberImpl(ROS1Subscriber):
             except Exception as e:
                 rospy.logerr_throttle(5, f"ROS1 bridge subscriber {self._topic}: {e}")
 
-        rospy.Subscriber(self._topic, self._msg_class, callback, queue_size=10)
+        queue_size = ROS1_SUBSCRIBER_QUEUE_SIZE_OVERRIDES.get(
+            self._topic,
+            ROS1_SUBSCRIBER_QUEUE_SIZE_DEFAULT,
+        )
+        rospy.Subscriber(self._topic, self._msg_class, callback, queue_size=queue_size)
 
 
 def create_ros1_publishers() -> List[ROS1Publisher]:
@@ -83,7 +97,11 @@ def create_ros1_publishers() -> List[ROS1Publisher]:
     for topic in sorted(ROS2_TO_ROS1_TOPICS):
         msg_class = TOPIC_TO_ROS1_MSG[topic]
         latch = topic in LATCHED_TOPICS
-        pub = rospy.Publisher(topic, msg_class, queue_size=1, latch=latch)
+        queue_size = ROS1_PUBLISHER_QUEUE_SIZE_OVERRIDES.get(
+            topic,
+            ROS1_PUBLISHER_QUEUE_SIZE_DEFAULT,
+        )
+        pub = rospy.Publisher(topic, msg_class, queue_size=queue_size, latch=latch)
         out.append(ROS1PublisherImpl(topic, pub))
     return out
 

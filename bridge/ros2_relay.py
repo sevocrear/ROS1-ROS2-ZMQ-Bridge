@@ -19,16 +19,14 @@ if BRIDGE_DIR not in sys.path:
     sys.path.insert(0, BRIDGE_DIR)
 
 from rclpy.node import Node
-from schema import (
-    ROS1_TO_ROS2_TOPICS, ROS2_TO_ROS1_TOPICS,
-    SEND_QUEUE_MAXSIZE, ZMQ_HWM, ZMQ_CONNECT_DELAY, TOPIC_TO_TYPE,
-    decode_message, _env_int,
-)
+from config_utils import SEND_QUEUE_MAXSIZE, ZMQ_CONNECT_DELAY, ZMQ_HWM, env_int
+from json_utils import decode_message
+from schema import ROS1_TO_ROS2_TOPICS, ROS2_TO_ROS1_TOPICS, TOPIC_TO_TYPE
 from ros2_handlers import create_ros2_publishers, create_ros2_subscribers
 
 PEER_HOST = os.environ.get("BRIDGE_PEER_HOST", "127.0.0.1")
-PORT_ROS1_TO_ROS2 = _env_int("BRIDGE_ZMQ_PORT_ROS1_TO_ROS2", 5555)
-PORT_ROS2_TO_ROS1 = _env_int("BRIDGE_ZMQ_PORT_ROS2_TO_ROS1", 5556)
+PORT_ROS1_TO_ROS2 = env_int("BRIDGE_ZMQ_PORT_ROS1_TO_ROS2", 5555)
+PORT_ROS2_TO_ROS1 = env_int("BRIDGE_ZMQ_PORT_ROS2_TO_ROS1", 5556)
 
 # Pre-encode ZMQ topic/type frames (avoids per-message string allocation).
 _TOPIC_FRAMES = {
