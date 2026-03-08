@@ -7,6 +7,7 @@ import array as _array
 import base64
 
 from ackermann_msgs.msg import AckermannDriveStamped
+from can_msgs.msg import Frame
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from tf2_msgs.msg import TFMessage
@@ -310,6 +311,43 @@ def dict_to_path(d, msg_class):
     return msg
 
 
+# --- can_msgs/Frame ---
+
+def frame_to_dict(msg):
+    """ROS2 can_msgs/Frame -> dict. data as list of int for JSON (ROS2 uses numpy uint8)."""
+    return {
+        "header": {
+            "stamp": {"sec": msg.header.stamp.sec, "nanosec": msg.header.stamp.nanosec},
+            "frame_id": msg.header.frame_id or "",
+        },
+        "id": int(msg.id),
+        "is_rtr": bool(msg.is_rtr),
+        "is_extended": bool(msg.is_extended),
+        "is_error": bool(msg.is_error),
+        "dlc": int(msg.dlc),
+        "data": [int(x) for x in msg.data],
+    }
+
+
+def dict_to_frame(d, msg_class):
+    """Dict -> ROS2 can_msgs/Frame."""
+    msg = msg_class()
+    h = d.get("header", {})
+    stamp = h.get("stamp", {})
+    msg.header.stamp.sec = int(stamp.get("sec", stamp.get("secs", 0)))
+    msg.header.stamp.nanosec = int(stamp.get("nanosec", stamp.get("nsecs", 0)))
+    msg.header.frame_id = h.get("frame_id", "")
+    msg.id = int(d.get("id", 0))
+    msg.is_rtr = bool(d.get("is_rtr", False))
+    msg.is_extended = bool(d.get("is_extended", False))
+    msg.is_error = bool(d.get("is_error", False))
+    msg.dlc = int(d.get("dlc", 0))
+    data = d.get("data", [])
+    for i in range(min(8, len(data))):
+        msg.data[i] = int(data[i]) & 0xFF
+    return msg
+
+
 # --- Type-based dispatch (topic names come from schema.TOPIC_TO_TYPE) ---
 
 # Message type string (ROS2 style) -> (msg_to_dict_fn, dict_to_msg_fn)
@@ -324,6 +362,7 @@ TYPE_TO_SERIALIZER = {
         occupancy_grid_to_dict,
         dict_to_occupancy_grid,
     ),
+    "can_msgs/msg/Frame": (frame_to_dict, dict_to_frame),
     "nav_msgs/msg/Odometry": (odometry_to_dict, dict_to_odometry),
     "tf2_msgs/msg/TFMessage": (tf_message_to_dict, dict_to_tf_message),
 }

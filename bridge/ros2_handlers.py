@@ -11,6 +11,7 @@ import rclpy
 from rclpy.node import Node
 
 from ackermann_msgs.msg import AckermannDriveStamped
+from can_msgs.msg import Frame
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from tf2_msgs.msg import TFMessage
@@ -24,6 +25,7 @@ import ros2_serializer
 # Message type string (from schema) -> ROS2 message class
 TYPE_TO_ROS2_MSG = {
     "ackermann_msgs/msg/AckermannDriveStamped": AckermannDriveStamped,
+    "can_msgs/msg/Frame": Frame,
     "geometry_msgs/msg/PoseStamped": PoseStamped,
     "nav_msgs/msg/Path": Path,
     "nav_msgs/msg/OccupancyGrid": OccupancyGrid,
@@ -47,7 +49,7 @@ class ROS2PublisherImpl(ROS2Publisher):
         self._topic = topic
         self._publisher = publisher
         self._msg_class = TOPIC_TO_ROS2_MSG[topic]
-
+        self._node.get_logger().info(f"ROS2 bridge publisher created for topic: {self._topic}")
     @property
     def topic(self) -> str:
         return self._topic
@@ -64,7 +66,7 @@ class ROS2SubscriberImpl(ROS2Subscriber):
         self._node = node
         self._topic = topic
         self._msg_class = msg_class
-
+        self._node.get_logger().info(f"ROS2 bridge subscriber created for topic: {self._topic}")
     @property
     def topic(self) -> str:
         return self._topic
@@ -77,7 +79,7 @@ class ROS2SubscriberImpl(ROS2Subscriber):
                 body = json.dumps(payload).encode("utf-8")
                 sender(self._topic, msg_type, body)
             except Exception as e:
-                self._node.get_logger().error(f"ROS2 bridge subscriber {self._topic}: {e}")
+                self._node.get_logger().error(f"ROS2 bridge subscriber failed for topic: {self._topic}: {e}, body: {msg}. payload: {payload}. Dropping message.")
 
         qos = resolve_subscription_qos(self._node, self._topic)
         self._node.create_subscription(self._msg_class, self._topic, callback, qos)

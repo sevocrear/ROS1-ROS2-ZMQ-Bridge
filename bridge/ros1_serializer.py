@@ -7,6 +7,7 @@ import array as _array
 import base64
 
 from ackermann_msgs.msg import AckermannDriveStamped
+from can_msgs.msg import Frame
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from tf2_msgs.msg import TFMessage
@@ -306,6 +307,42 @@ def dict_to_path(d, msg_class):
     return msg
 
 
+# --- can_msgs/Frame ---
+
+def frame_to_dict(msg):
+    """ROS1 can_msgs/Frame -> dict (ROS2-compatible: stamp.sec, stamp.nanosec). data as ints for JSON."""
+    return {
+        "header": {
+            "stamp": {"sec": msg.header.stamp.secs, "nanosec": msg.header.stamp.nsecs},
+            "frame_id": msg.header.frame_id or "",
+        },
+        "id": int(msg.id),
+        "is_rtr": bool(msg.is_rtr),
+        "is_extended": bool(msg.is_extended),
+        "is_error": bool(msg.is_error),
+        "dlc": int(msg.dlc),
+        "data": [int(x) for x in msg.data],
+    }
+
+
+def dict_to_frame(d, msg_class):
+    """Dict -> ROS1 can_msgs/Frame. Assign data as a sequence; ROS1 msg.data can be bytes (immutable)."""
+    msg = msg_class()
+    h = d.get("header", {})
+    stamp = h.get("stamp", {})
+    msg.header.stamp.secs = stamp.get("secs", stamp.get("sec", 0))
+    msg.header.stamp.nsecs = stamp.get("nsecs", stamp.get("nanosec", 0))
+    msg.header.frame_id = h.get("frame_id", "")
+    msg.id = int(d.get("id", 0))
+    msg.is_rtr = bool(d.get("is_rtr", False))
+    msg.is_extended = bool(d.get("is_extended", False))
+    msg.is_error = bool(d.get("is_error", False))
+    msg.dlc = int(d.get("dlc", 0))
+    data_src = d.get("data", [])
+    msg.data = [int(data_src[i]) & 0xFF if i < len(data_src) else 0 for i in range(8)]
+    return msg
+
+
 # --- Type-based dispatch (topic names come from schema.TOPIC_TO_TYPE) ---
 
 # Message type string (ROS2 style, from schema) -> (msg_to_dict_fn, dict_to_msg_fn)
@@ -320,6 +357,7 @@ TYPE_TO_SERIALIZER = {
         occupancy_grid_to_dict,
         dict_to_occupancy_grid,
     ),
+    "can_msgs/msg/Frame": (frame_to_dict, dict_to_frame),
     "nav_msgs/msg/Odometry": (odometry_to_dict, dict_to_odometry),
     "tf2_msgs/msg/TFMessage": (tf_message_to_dict, dict_to_tf_message),
 }

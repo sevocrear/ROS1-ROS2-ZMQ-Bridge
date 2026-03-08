@@ -32,7 +32,8 @@ RUN apt-get update && \
     apt-get install -y \
         ros-${ROS_VERSION}-nav-msgs \
         ros-${ROS_VERSION}-tf2-msgs \
-        ros-${ROS_VERSION}-ackermann-msgs && \
+        ros-${ROS_VERSION}-ackermann-msgs \
+        ros-${ROS_VERSION}-can-msgs && \
     rm -rf /var/lib/apt/lists/* /tmp/ros2-apt-source.deb
 
 WORKDIR /opt/bridge

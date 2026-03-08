@@ -22,6 +22,8 @@ TOPIC_TO_TYPE = {
     "/move_base_simple/goal": "geometry_msgs/msg/PoseStamped",
     "/move_base/PathPlanner/plan": "nav_msgs/msg/Path",
     "/map": "nav_msgs/msg/OccupancyGrid",
+    "/received_messages": "can_msgs/msg/Frame",
+    "/sent_messages": "can_msgs/msg/Frame",
     "/tf": "tf2_msgs/msg/TFMessage",
     "/wheel_odometry/odometry": "nav_msgs/msg/Odometry",
 }
@@ -29,6 +31,7 @@ TOPIC_TO_TYPE = {
 # Direction: which relay publishes to ZMQ (and the other subscribes from ZMQ
 # and publishes to the local ROS graph).
 ROS1_TO_ROS2_TOPICS = {
+    "/received_messages",
     "/tf",
     "/move_base_simple/goal",
     "/wheel_odometry/odometry",
@@ -37,6 +40,7 @@ ROS2_TO_ROS1_TOPICS = {
     "/map",
     "/control_cmd",
     "/move_base/PathPlanner/plan",
+    "/sent_messages",
 }
 
 # Latched / TRANSIENT_LOCAL topics: late joiners receive last message
@@ -86,6 +90,18 @@ ROS2_QOS_PUBLISHER_OVERRIDES = {
         "history": "KEEP_LAST",
         "depth": 100,
     },
+    "/received_messages": {
+        "reliability": "RELIABLE",
+        "durability": "VOLATILE",
+        "history": "KEEP_LAST",
+        "depth": 100,
+    },
+    "/sent_messages": {
+        "reliability": "BEST_EFFORT",
+        "durability": "VOLATILE",
+        "history": "KEEP_LAST",
+        "depth": 100,
+    },
 }
 
 # Per-topic QoS overrides for ROS2 subscriptions (bridge reading from ROS2).
@@ -96,6 +112,18 @@ ROS2_QOS_SUBSCRIPTION_OVERRIDES = {
         "durability": "TRANSIENT_LOCAL",
         "history": "KEEP_LAST",
         "depth": 1,
+    },
+    "/received_messages": {
+        "reliability": "BEST_EFFORT",
+        "durability": "VOLATILE",
+        "history": "KEEP_LAST",
+        "depth": 100,
+    },
+    "/sent_messages": {
+        "reliability": "BEST_EFFORT",
+        "durability": "VOLATILE",
+        "history": "KEEP_LAST",
+        "depth": 100,
     },
 }
 

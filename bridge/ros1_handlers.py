@@ -10,6 +10,7 @@ from typing import List
 import rospy
 
 from ackermann_msgs.msg import AckermannDriveStamped
+from can_msgs.msg import Frame
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from tf2_msgs.msg import TFMessage
@@ -31,6 +32,7 @@ import ros1_serializer
 # Message type string (from schema) -> ROS1 message class
 TYPE_TO_ROS1_MSG = {
     "ackermann_msgs/msg/AckermannDriveStamped": AckermannDriveStamped,
+    "can_msgs/msg/Frame": Frame,
     "geometry_msgs/msg/PoseStamped": PoseStamped,
     "nav_msgs/msg/Path": Path,
     "nav_msgs/msg/OccupancyGrid": OccupancyGrid,
@@ -53,7 +55,6 @@ class ROS1PublisherImpl(ROS1Publisher):
         self._topic = topic
         self._publisher = publisher
         self._msg_class = TOPIC_TO_ROS1_MSG[topic]
-
     @property
     def topic(self) -> str:
         return self._topic
@@ -69,7 +70,6 @@ class ROS1SubscriberImpl(ROS1Subscriber):
     def __init__(self, topic: str, msg_class: type):
         self._topic = topic
         self._msg_class = msg_class
-
     @property
     def topic(self) -> str:
         return self._topic
@@ -82,14 +82,13 @@ class ROS1SubscriberImpl(ROS1Subscriber):
                 body = json.dumps(payload).encode("utf-8")
                 sender(self._topic, msg_type, body)
             except Exception as e:
-                rospy.logerr_throttle(5, f"ROS1 bridge subscriber {self._topic}: {e}")
-
+                rospy.logerr_throttle(5, "ROS1 bridge subscriber %s: %s", self._topic, e)
         queue_size = ROS1_SUBSCRIBER_QUEUE_SIZE_OVERRIDES.get(
             self._topic,
             ROS1_SUBSCRIBER_QUEUE_SIZE_DEFAULT,
         )
         rospy.Subscriber(self._topic, self._msg_class, callback, queue_size=queue_size)
-
+        print(f"ROS1 bridge subscriber created for topic: {self._topic}")
 
 def create_ros1_publishers() -> List[ROS1Publisher]:
     """Build one ROS1Publisher per ROS2->ROS1 topic. Latched for LATCHED_TOPICS (e.g. /map)."""
@@ -103,6 +102,7 @@ def create_ros1_publishers() -> List[ROS1Publisher]:
         )
         pub = rospy.Publisher(topic, msg_class, queue_size=queue_size, latch=latch)
         out.append(ROS1PublisherImpl(topic, pub))
+        print(f"ROS1 bridge publisher created for topic: {topic}")
     return out
 
 

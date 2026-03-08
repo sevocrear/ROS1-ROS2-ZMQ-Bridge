@@ -42,8 +42,8 @@ def env_float(name: str, default: float) -> float:
 
 # --- ZMQ / queue configuration ------------------------------------------------
 
-# Max items in each per-topic send queue.
-SEND_QUEUE_MAXSIZE: int = env_int("BRIDGE_SEND_QUEUE_MAXSIZE", 100)
+# Max items in each per-topic send queue (needs to handle high-rate topics e.g. CAN ~600 Hz).
+SEND_QUEUE_MAXSIZE: int = env_int("BRIDGE_SEND_QUEUE_MAXSIZE", 5000)
 
 # ZMQ high-water mark for PUB/SUB sockets (per-socket buffer depth).
 ZMQ_HWM: int = env_int("BRIDGE_ZMQ_HWM", 500)

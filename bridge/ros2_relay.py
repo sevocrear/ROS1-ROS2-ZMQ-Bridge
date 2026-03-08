@@ -83,7 +83,8 @@ class ROS2BridgeRelay(Node):
         # Guard condition + queue for thread-safe publishing from ZMQ receive thread.
         # The guard condition wakes the rclpy executor so publishing always runs
         # in the executor thread — no cross-thread rclpy.Publisher.publish() calls.
-        self._recv_queue = queue.Queue(maxsize=1000)
+        # Size must handle high-rate topics (e.g. CAN ~600 Hz).
+        self._recv_queue = queue.Queue(maxsize=10000)
         self._recv_guard = self.create_guard_condition(self._drain_recv_queue)
 
         self.get_logger().info(
