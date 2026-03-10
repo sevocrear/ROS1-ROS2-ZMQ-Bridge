@@ -9,8 +9,19 @@ Hz on the other side — all via `docker exec` against the running compose stack
 |---|---|---|---|
 | ROS1 | `/tf` | 100 Hz | ROS2 |
 | ROS1 | `/move_base_simple/goal` | 10 Hz | ROS2 |
+| ROS1 | `/driver/lidar/top` (PointCloud2) | 5 Hz | ROS2 (see below) |
 | ROS2 | `/control_cmd` | 1000 Hz | ROS1 |
 | ROS2 | `/map` | 100 Hz | ROS1 |
+
+### PointCloud2 bridge test
+
+A dedicated script verifies that `sensor_msgs/PointCloud2` is correctly bridged from ROS1 to ROS2 for `/driver/lidar/top`:
+
+```bash
+./tests/run_pointcloud_test.sh
+```
+
+This starts a synthetic PointCloud2 publisher in the ROS1 container and checks on the ROS2 side that messages arrive with the expected `frame_id` and data length. No need to run `run_bridge_test.sh` for this; run it anytime the bridge is up.
 
 ## Usage
 

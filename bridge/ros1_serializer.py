@@ -10,6 +10,7 @@ from ackermann_msgs.msg import AckermannDriveStamped
 from can_msgs.msg import Frame
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
+from sensor_msgs.msg import PointCloud2, PointField
 from tf2_msgs.msg import TFMessage
 
 from schema import TOPIC_TO_TYPE
@@ -307,6 +308,65 @@ def dict_to_path(d, msg_class):
     return msg
 
 
+# --- sensor_msgs/PointCloud2 ---
+
+def pointcloud2_to_dict(msg):
+    """ROS1 PointCloud2 -> dict. Raw data as base64 (data_b64) for efficiency."""
+    if hasattr(msg.data, "tobytes"):
+        raw = msg.data.tobytes()
+    else:
+        raw = bytes(msg.data) if isinstance(msg.data, (bytes, bytearray)) else _array.array("B", msg.data).tobytes()
+    return {
+        "header": {
+            "stamp": {"sec": msg.header.stamp.secs, "nanosec": msg.header.stamp.nsecs},
+            "frame_id": msg.header.frame_id or "",
+        },
+        "height": int(msg.height),
+        "width": int(msg.width),
+        "is_bigendian": bool(msg.is_bigendian),
+        "point_step": int(msg.point_step),
+        "row_step": int(msg.row_step),
+        "is_dense": bool(msg.is_dense),
+        "fields": [
+            {"name": f.name, "offset": int(f.offset), "datatype": int(f.datatype), "count": int(f.count)}
+            for f in msg.fields
+        ],
+        "data_b64": base64.b64encode(raw).decode("ascii"),
+    }
+
+
+def dict_to_pointcloud2(d, msg_class):
+    """Dict -> ROS1 PointCloud2."""
+    msg = msg_class()
+    h = d.get("header", {})
+    stamp = h.get("stamp", {})
+    msg.header.stamp.secs = stamp.get("secs", stamp.get("sec", 0))
+    msg.header.stamp.nsecs = stamp.get("nsecs", stamp.get("nanosec", 0))
+    msg.header.frame_id = h.get("frame_id", "")
+    msg.height = int(d.get("height", 0))
+    msg.width = int(d.get("width", 0))
+    msg.is_bigendian = bool(d.get("is_bigendian", False))
+    msg.point_step = int(d.get("point_step", 0))
+    msg.row_step = int(d.get("row_step", 0))
+    msg.is_dense = bool(d.get("is_dense", True))
+    msg.fields = []
+    for f in d.get("fields", []):
+        pf = PointField()
+        pf.name = str(f.get("name", ""))
+        pf.offset = int(f.get("offset", 0))
+        pf.datatype = int(f.get("datatype", 0))
+        pf.count = int(f.get("count", 0))
+        msg.fields.append(pf)
+    if "data_b64" in d:
+        raw = base64.b64decode(d["data_b64"])
+        msg.data = _array.array("B")
+        msg.data.frombytes(raw)
+        msg.data = list(msg.data)
+    else:
+        msg.data = list(d.get("data", []))
+    return msg
+
+
 # --- can_msgs/Frame ---
 
 def frame_to_dict(msg):
@@ -359,6 +419,7 @@ TYPE_TO_SERIALIZER = {
     ),
     "can_msgs/msg/Frame": (frame_to_dict, dict_to_frame),
     "nav_msgs/msg/Odometry": (odometry_to_dict, dict_to_odometry),
+    "sensor_msgs/msg/PointCloud2": (pointcloud2_to_dict, dict_to_pointcloud2),
     "tf2_msgs/msg/TFMessage": (tf_message_to_dict, dict_to_tf_message),
 }
 

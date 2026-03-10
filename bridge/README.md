@@ -11,6 +11,8 @@ This is the source of truth for the bridge behavior; it must stay in sync with `
 
 | Topic                         | Direction     | Type                                   | Notes                                        |
 |------------------------------|---------------|----------------------------------------|----------------------------------------------|
+| `/driver/lidar/top`          | ROS1 → ROS2   | `sensor_msgs/msg/PointCloud2`          | Lidar; data as base64 (`data_b64`)          |
+| `/driver/lidar/frontbottom`  | ROS1 → ROS2   | `sensor_msgs/msg/PointCloud2`          | Lidar; data as base64 (`data_b64`)          |
 | `/tf`                        | ROS1 → ROS2   | `tf2_msgs/msg/TFMessage`              | High rate, BEST_EFFORT QoS on ROS2          |
 | `/move_base_simple/goal`     | ROS1 → ROS2   | `geometry_msgs/msg/PoseStamped`       | Navigation goal pose                        |
 | `/wheel_odometry/odometry`   | ROS1 → ROS2   | `nav_msgs/msg/Odometry`               | High rate, BEST_EFFORT QoS on ROS2          |
@@ -49,6 +51,9 @@ There is no `bridge.yaml` currently used by the code; the schema is Python-only 
 - `OccupancyGrid.data`:
   - Serialized as a base64-encoded signed int8 byte array under key `data_b64`.
   - Deserializers accept both `data_b64` (new, efficient format) and legacy `data` (JSON list of ints) for compatibility.
+- `PointCloud2` (e.g. `/driver/lidar/top`, `/driver/lidar/frontbottom`):
+  - Header, `height`, `width`, `is_bigendian`, `point_step`, `row_step`, `is_dense`, and `fields` (list of `{name, offset, datatype, count}`) are serialized as JSON.
+  - Raw point data is sent as base64 under key `data_b64` for efficiency.
 
 When adding a new type, mirror the same dict structure in both serializers.
 
