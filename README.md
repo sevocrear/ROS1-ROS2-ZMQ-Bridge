@@ -25,6 +25,8 @@ Current topic mapping is driven by `bridge/schema.py`:
 
 | Topic                         | Direction     | Type                                   | Notes                            |
 |------------------------------|---------------|----------------------------------------|----------------------------------|
+| `/driver/lidar/top`          | ROS1 → ROS2   | `sensor_msgs/msg/PointCloud2`          | Lidar; data as base64           |
+| `/driver/lidar/frontbottom`  | ROS1 → ROS2   | `sensor_msgs/msg/PointCloud2`          | Lidar; data as base64           |
 | `/tf`                        | ROS1 → ROS2   | `tf2_msgs/msg/TFMessage`              | High rate, BEST_EFFORT on ROS2  |
 | `/move_base_simple/goal`     | ROS1 → ROS2   | `geometry_msgs/msg/PoseStamped`       | Navigation goal pose            |
 | `/wheel_odometry/odometry`   | ROS1 → ROS2   | `nav_msgs/msg/Odometry`               | High rate, BEST_EFFORT on ROS2  |

@@ -10,6 +10,7 @@ from ackermann_msgs.msg import AckermannDriveStamped
 from can_msgs.msg import Frame
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
+from sensor_msgs.msg import PointCloud2, PointField
 from tf2_msgs.msg import TFMessage
 
 from schema import TOPIC_TO_TYPE
@@ -168,6 +169,10 @@ def occupancy_grid_to_dict(msg):
             "width": msg.info.width,
             "height": msg.info.height,
             "resolution": msg.info.resolution,
+            "map_load_time": {
+                "sec": msg.info.map_load_time.sec,
+                "nanosec": msg.info.map_load_time.nanosec,
+            },
             "origin": {
                 "position": {"x": msg.info.origin.position.x, "y": msg.info.origin.position.y, "z": msg.info.origin.position.z},
                 "orientation": {
@@ -194,6 +199,9 @@ def dict_to_occupancy_grid(d, msg_class):
     msg.info.width = int(info.get("width", 0))
     msg.info.height = int(info.get("height", 0))
     msg.info.resolution = float(info.get("resolution", 0))
+    map_load_time = info.get("map_load_time", {})
+    msg.info.map_load_time.sec = int(map_load_time.get("sec", map_load_time.get("secs", 0)))
+    msg.info.map_load_time.nanosec = int(map_load_time.get("nanosec", map_load_time.get("nsecs", 0)))
     orig = info.get("origin", {})
     pos = orig.get("position", {})
     msg.info.origin.position.x = float(pos.get("x", 0))
@@ -311,6 +319,65 @@ def dict_to_path(d, msg_class):
     return msg
 
 
+# --- sensor_msgs/PointCloud2 ---
+
+def pointcloud2_to_dict(msg):
+    """ROS2 PointCloud2 -> dict. Raw data as base64 (data_b64) for efficiency."""
+    if hasattr(msg.data, "tobytes"):
+        raw = msg.data.tobytes()
+    else:
+        raw = bytes(msg.data) if isinstance(msg.data, (bytes, bytearray)) else _array.array("B", msg.data).tobytes()
+    return {
+        "header": {
+            "stamp": {"sec": msg.header.stamp.sec, "nanosec": msg.header.stamp.nanosec},
+            "frame_id": msg.header.frame_id or "",
+        },
+        "height": int(msg.height),
+        "width": int(msg.width),
+        "is_bigendian": bool(msg.is_bigendian),
+        "point_step": int(msg.point_step),
+        "row_step": int(msg.row_step),
+        "is_dense": bool(msg.is_dense),
+        "fields": [
+            {"name": f.name, "offset": int(f.offset), "datatype": int(f.datatype), "count": int(f.count)}
+            for f in msg.fields
+        ],
+        "data_b64": base64.b64encode(raw).decode("ascii"),
+    }
+
+
+def dict_to_pointcloud2(d, msg_class):
+    """Dict -> ROS2 PointCloud2."""
+    msg = msg_class()
+    h = d.get("header", {})
+    stamp = h.get("stamp", {})
+    msg.header.stamp.sec = int(stamp.get("sec", stamp.get("secs", 0)))
+    msg.header.stamp.nanosec = int(stamp.get("nanosec", stamp.get("nsecs", 0)))
+    msg.header.frame_id = h.get("frame_id", "")
+    msg.height = int(d.get("height", 0))
+    msg.width = int(d.get("width", 0))
+    msg.is_bigendian = bool(d.get("is_bigendian", False))
+    msg.point_step = int(d.get("point_step", 0))
+    msg.row_step = int(d.get("row_step", 0))
+    msg.is_dense = bool(d.get("is_dense", True))
+    msg.fields = []
+    for f in d.get("fields", []):
+        pf = PointField()
+        pf.name = str(f.get("name", ""))
+        pf.offset = int(f.get("offset", 0))
+        pf.datatype = int(f.get("datatype", 0))
+        pf.count = int(f.get("count", 0))
+        msg.fields.append(pf)
+    if "data_b64" in d:
+        raw = base64.b64decode(d["data_b64"])
+        a = _array.array("B")
+        a.frombytes(raw)
+        msg.data = a
+    else:
+        msg.data = _array.array("B", [int(x) for x in d.get("data", [])])
+    return msg
+
+
 # --- can_msgs/Frame ---
 
 def frame_to_dict(msg):
@@ -364,6 +431,7 @@ TYPE_TO_SERIALIZER = {
     ),
     "can_msgs/msg/Frame": (frame_to_dict, dict_to_frame),
     "nav_msgs/msg/Odometry": (odometry_to_dict, dict_to_odometry),
+    "sensor_msgs/msg/PointCloud2": (pointcloud2_to_dict, dict_to_pointcloud2),
     "tf2_msgs/msg/TFMessage": (tf_message_to_dict, dict_to_tf_message),
 }
 

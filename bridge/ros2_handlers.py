@@ -14,6 +14,7 @@ from ackermann_msgs.msg import AckermannDriveStamped
 from can_msgs.msg import Frame
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
+from sensor_msgs.msg import PointCloud2
 from tf2_msgs.msg import TFMessage
 
 from interfaces import ROS2Publisher, ROS2Subscriber, ZmqSender
@@ -30,6 +31,7 @@ TYPE_TO_ROS2_MSG = {
     "nav_msgs/msg/Path": Path,
     "nav_msgs/msg/OccupancyGrid": OccupancyGrid,
     "nav_msgs/msg/Odometry": Odometry,
+    "sensor_msgs/msg/PointCloud2": PointCloud2,
     "tf2_msgs/msg/TFMessage": TFMessage,
 }
 

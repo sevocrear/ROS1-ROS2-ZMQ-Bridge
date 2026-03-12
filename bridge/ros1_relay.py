@@ -33,7 +33,7 @@ _TOPIC_FRAMES = {
 
 
 def main():
-    rospy.init_node("ros1_bridge_relay", anonymous=False)
+    rospy.init_node("bridge_ros1", anonymous=False)
 
     publishers = {p.topic: p for p in create_ros1_publishers()}
     subscribers = create_ros1_subscribers()

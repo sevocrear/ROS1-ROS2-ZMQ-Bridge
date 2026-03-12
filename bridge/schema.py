@@ -19,6 +19,8 @@ from __future__ import annotations
 # Topic -> message type name (ROS2 style: pkg/msg/Type)
 TOPIC_TO_TYPE = {
     "/control_cmd": "ackermann_msgs/msg/AckermannDriveStamped",
+    "/driver/lidar/frontbottom": "sensor_msgs/msg/PointCloud2",
+    "/driver/lidar/top": "sensor_msgs/msg/PointCloud2",
     "/move_base_simple/goal": "geometry_msgs/msg/PoseStamped",
     "/move_base/PathPlanner/plan": "nav_msgs/msg/Path",
     "/map": "nav_msgs/msg/OccupancyGrid",
@@ -31,6 +33,8 @@ TOPIC_TO_TYPE = {
 # Direction: which relay publishes to ZMQ (and the other subscribes from ZMQ
 # and publishes to the local ROS graph).
 ROS1_TO_ROS2_TOPICS = {
+    "/driver/lidar/frontbottom",
+    "/driver/lidar/top",
     "/received_messages",
     "/tf",
     "/move_base_simple/goal",
@@ -85,7 +89,7 @@ ROS2_QOS_PUBLISHER_OVERRIDES = {
         "depth": 100,
     },
     "/tf": {
-        "reliability": "BEST_EFFORT",
+        "reliability": "RELIABLE",
         "durability": "VOLATILE",
         "history": "KEEP_LAST",
         "depth": 100,
@@ -101,6 +105,19 @@ ROS2_QOS_PUBLISHER_OVERRIDES = {
         "durability": "VOLATILE",
         "history": "KEEP_LAST",
         "depth": 100,
+    },
+    # Lidar point clouds: high-rate, loss-tolerant sensor data.
+    "/driver/lidar/top": {
+        "reliability": "BEST_EFFORT",
+        "durability": "VOLATILE",
+        "history": "KEEP_LAST",
+        "depth": 10,
+    },
+    "/driver/lidar/frontbottom": {
+        "reliability": "BEST_EFFORT",
+        "durability": "VOLATILE",
+        "history": "KEEP_LAST",
+        "depth": 10,
     },
 }
 
