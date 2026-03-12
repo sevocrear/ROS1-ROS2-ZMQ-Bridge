@@ -48,6 +48,9 @@ There is no `bridge.yaml` currently used by the code; the schema is Python-only 
   - ROS1: `header.stamp.secs` / `header.stamp.nsecs`
   - ROS2: `header.stamp.sec` / `header.stamp.nanosec`
   - The dict uses `{ "stamp": { "sec": ..., "nanosec": ... } }`, and serializers handle either flavor.
+- `OccupancyGrid` preserves both timestamp fields exactly:
+  - `header.stamp`
+  - `info.map_load_time`
 - `OccupancyGrid.data`:
   - Serialized as a base64-encoded signed int8 byte array under key `data_b64`.
   - Deserializers accept both `data_b64` (new, efficient format) and legacy `data` (JSON list of ints) for compatibility.

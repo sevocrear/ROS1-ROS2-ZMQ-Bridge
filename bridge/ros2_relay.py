@@ -39,7 +39,7 @@ class ROS2BridgeRelay(Node):
     """Relay node: ZMQ to/from ROS2 via handler interfaces."""
 
     def __init__(self):
-        super().__init__("ros2_bridge_relay")
+        super().__init__("bridge_ros2")
 
         # --- ZMQ sockets ---
         self._zmq_context = zmq.Context()

@@ -89,7 +89,7 @@ ROS2_QOS_PUBLISHER_OVERRIDES = {
         "depth": 100,
     },
     "/tf": {
-        "reliability": "BEST_EFFORT",
+        "reliability": "RELIABLE",
         "durability": "VOLATILE",
         "history": "KEEP_LAST",
         "depth": 100,

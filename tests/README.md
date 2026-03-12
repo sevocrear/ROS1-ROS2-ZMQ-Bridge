@@ -23,6 +23,18 @@ A dedicated script verifies that `sensor_msgs/PointCloud2` is correctly bridged 
 
 This starts a synthetic PointCloud2 publisher in the ROS1 container and checks on the ROS2 side that messages arrive with the expected `frame_id` and data length. No need to run `run_bridge_test.sh` for this; run it anytime the bridge is up.
 
+### OccupancyGrid timestamp regression checks
+
+These scripts validate serializer round-trip precision for both `header.stamp` and `info.map_load_time`:
+
+```bash
+# Run in ROS1 environment/container
+python3 tests/ros1_check_occupancygrid_timestamps.py
+
+# Run in ROS2 environment/container
+python3 tests/ros2_check_occupancygrid_timestamps.py
+```
+
 ## Usage
 
 ```bash

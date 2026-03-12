@@ -169,6 +169,10 @@ def occupancy_grid_to_dict(msg):
             "width": msg.info.width,
             "height": msg.info.height,
             "resolution": msg.info.resolution,
+            "map_load_time": {
+                "sec": msg.info.map_load_time.sec,
+                "nanosec": msg.info.map_load_time.nanosec,
+            },
             "origin": {
                 "position": {"x": msg.info.origin.position.x, "y": msg.info.origin.position.y, "z": msg.info.origin.position.z},
                 "orientation": {
@@ -195,6 +199,9 @@ def dict_to_occupancy_grid(d, msg_class):
     msg.info.width = int(info.get("width", 0))
     msg.info.height = int(info.get("height", 0))
     msg.info.resolution = float(info.get("resolution", 0))
+    map_load_time = info.get("map_load_time", {})
+    msg.info.map_load_time.sec = int(map_load_time.get("sec", map_load_time.get("secs", 0)))
+    msg.info.map_load_time.nanosec = int(map_load_time.get("nanosec", map_load_time.get("nsecs", 0)))
     orig = info.get("origin", {})
     pos = orig.get("position", {})
     msg.info.origin.position.x = float(pos.get("x", 0))

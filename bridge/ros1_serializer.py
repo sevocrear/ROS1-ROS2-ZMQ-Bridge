@@ -166,6 +166,10 @@ def occupancy_grid_to_dict(msg):
             "width": msg.info.width,
             "height": msg.info.height,
             "resolution": msg.info.resolution,
+            "map_load_time": {
+                "sec": msg.info.map_load_time.secs,
+                "nanosec": msg.info.map_load_time.nsecs,
+            },
             "origin": {
                 "position": {"x": msg.info.origin.position.x, "y": msg.info.origin.position.y, "z": msg.info.origin.position.z},
                 "orientation": {
@@ -185,13 +189,16 @@ def dict_to_occupancy_grid(d, msg_class):
     msg = msg_class()
     h = d.get("header", {})
     stamp = h.get("stamp", {})
-    msg.header.stamp.secs = stamp.get("secs", stamp.get("sec", 0))
-    msg.header.stamp.nsecs = stamp.get("nsecs", stamp.get("nanosec", 0))
+    msg.header.stamp.secs = int(stamp.get("secs", stamp.get("sec", 0)))
+    msg.header.stamp.nsecs = int(stamp.get("nsecs", stamp.get("nanosec", 0)))
     msg.header.frame_id = h.get("frame_id", "")
     info = d.get("info", {})
     msg.info.width = int(info.get("width", 0))
     msg.info.height = int(info.get("height", 0))
     msg.info.resolution = float(info.get("resolution", 0))
+    map_load_time = info.get("map_load_time", {})
+    msg.info.map_load_time.secs = int(map_load_time.get("secs", map_load_time.get("sec", 0)))
+    msg.info.map_load_time.nsecs = int(map_load_time.get("nsecs", map_load_time.get("nanosec", 0)))
     orig = info.get("origin", {})
     pos = orig.get("position", {})
     msg.info.origin.position.x = float(pos.get("x", 0))
