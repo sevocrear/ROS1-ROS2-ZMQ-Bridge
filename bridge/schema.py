@@ -33,17 +33,17 @@ TOPIC_TO_TYPE = {
 # Direction: which relay publishes to ZMQ (and the other subscribes from ZMQ
 # and publishes to the local ROS graph).
 ROS1_TO_ROS2_TOPICS = {
-    "/driver/lidar/frontbottom",
-    "/driver/lidar/top",
+    # "/driver/lidar/frontbottom",
+    # "/driver/lidar/top",
     "/received_messages",
-    "/tf",
-    "/move_base_simple/goal",
-    "/wheel_odometry/odometry",
+    # "/tf",
+    # "/move_base_simple/goal",
+    # "/wheel_odometry/odometry",
 }
 ROS2_TO_ROS1_TOPICS = {
-    "/map",
-    "/control_cmd",
-    "/move_base/PathPlanner/plan",
+    # "/map",
+    # "/control_cmd",
+    # "/move_base/PathPlanner/plan",
     "/sent_messages",
 }
 
